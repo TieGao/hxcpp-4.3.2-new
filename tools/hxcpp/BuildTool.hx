@@ -2208,12 +2208,24 @@ class BuildTool
                if (extract_version.match(file))
                {
                   var ver = extract_version.matched(1);
-                  var split_best = best.split(".");
-                  var split_ver = ver.split(".");
-                  if (Std.parseFloat(split_ver[0]) > Std.parseFloat(split_best[0]) || Std.parseFloat(split_ver[1]) > Std.parseFloat(split_best[1]))
+                  // 正确比较“最高版本”：主版本大才取；主版本相同再比次版本。
+                  // 旧写法用 `||`，主版本更小但次版本更大的旧 SDK 也会被选中，
+                  // 在 Xcode 26 的 SDKs/ 下会把 MacOSX26.sdk 算成 "26"，而
+                  // xcodebuild -sdk macosx26 严格匹配会报 cannot be located。
+                  var sb = best.split(".");
+                  var sv = ver.split(".");
+                  var mb = Std.parseFloat(sb[0]);
+                  var mv = Std.parseFloat(sv[0]);
+                  var nb = sb.length > 1 ? Std.parseFloat(sb[1]) : 0;
+                  var nv = sv.length > 1 ? Std.parseFloat(sv[1]) : 0;
+                  if (mv > mb || (mv == mb && nv > nb))
                      best = ver;
                }
             }
+            // SDKs/ 里常有个不带次版本的软链（如 MacOSX26.sdk -> MacOSX26.0.sdk），
+            // 一旦 best 落到这种 "26"，xcodebuild 会报 cannot be located，补上 .0。
+            if (best != "0.0" && best.indexOf(".") < 0)
+               best = best + ".0";
             if (best!="0.0")
                defines.set("MACOSX_VER",best);
             else
